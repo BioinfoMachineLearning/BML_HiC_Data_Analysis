@@ -1,21 +1,18 @@
 # import standard python libraries
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
-import os
 import cooltools
 import cooler
 from cooltools import insulation
-# from cooltools.insulation import calculate_insulation_score, find_boundaries
 from matplotlib.lines import Line2D
 
-from utlis import coverage, insulation_plot, boundaries, balance_matrix, difference_matrix, get_windows, ims, ab_plot, \
+from utlis import insulation_plot, boundaries, balance_matrix, difference_matrix, get_windows, ims, ab_plot, \
     ab_plot_overlay, convert_bytes
 from pathlib import Path
-import itertools
 import bioframe
 import os, subprocess
+from scipy.stats import zscore
 
 
 DATA_PATH = '../MuSC_HiC_files/HiC_not_normalized/not_normalized_{}_{}.cool'
@@ -169,9 +166,8 @@ def compartment_overlay(datatype, resolution, save_fig=False):
             # cis_eigs[0] returns eigenvalues, here we focus on eigenvectors
             eigenvector_track = cis_eigs[1][['chrom', 'start', 'end', 'E1']]
             eigenvector_track = eigenvector_track.loc[eigenvector_track['chrom'] == chro]
+
             eigenvector_track.reset_index(drop=True, inplace=True)
-
-
 
             ab_plot_overlay(eigenvector_track, ax, (pos, i))
         ax.set_ylabel('Sample')
@@ -183,6 +179,75 @@ def compartment_overlay(datatype, resolution, save_fig=False):
         else:
             plt.show()
 
+def difference(x):
+    return abs(x['omf'] - x['ymf'])
+
+def eigen_pvalue(datatype, resolution, save_fig=False):
+    # fasta sequence is required for calculating binned profile of GC content
+    if not os.path.isfile('../MuSC_HiC_files/fasta/mm10.fa'):
+        # note downloading a ~1Gb file can take a minute
+        subprocess.call(
+            'wget -O ../MuSC_HiC_files/fasta/mm10.fa.gz https://hgdownload.cse.ucsc.edu/goldenpath/mm10/bigZips/mm10.fa.gz',
+            shell=True)
+        subprocess.call('gunzip ../MuSC_HiC_files/fasta/mm10.fa.gz', shell=True)
+
+    # Using 1mb for AB compartment
+    chros = ['chr{}'.format(i) for i in list(range(1, 20))]
+    for chro in chros:
+        # fig, ax = plt.subplots(figsize=(20, 16))
+        fig, ax = plt.subplots(figsize=(12, 6), dpi=120)
+        df = pd.DataFrame()
+        for pos, i in enumerate(samples):
+            if datatype == 'raw':
+                clr = cooler.Cooler('../MuSC_HiC_files/raw/{}_{}.cool'.format(i.upper(), resolution))
+            elif datatype == 'norm':
+                clr = cooler.Cooler('../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_{}.cool'.format(i, resolution))
+            elif datatype == 'not norm':
+                clr = cooler.Cooler('../MuSC_HiC_files/HiC_not_normalized/not_normalized_{}_{}.cool'.format(i, resolution))
+
+            # Check if fraction of GC file exist
+            GC_PATH = '../Results/GC/{}_mm10_gc_cov_{}_{}.tsv'.format(datatype, i, resolution)
+            if Path(GC_PATH).is_file():
+                gc_cov = pd.read_csv(GC_PATH, sep='\t')
+            else:
+                bins = clr.bins()[:]
+                mm10_genome = bioframe.load_fasta('../MuSC_HiC_files/fasta/mm10.fa');
+                #  note the next command may require installing pysam
+                gc_cov = bioframe.frac_gc(bins, mm10_genome)
+                gc_cov.to_csv(GC_PATH, index=False, sep='\t')
+
+            view_df = pd.DataFrame({'chrom': clr.chromnames, 'start': 0, 'end': clr.chromsizes.values, 'name': clr.chromnames})
+            cis_eigs = cooltools.eigs_cis(clr, gc_cov, view_df=view_df, n_eigs=3, phasing_track_col='GC',)
+
+            # cis_eigs[0] returns eigenvalues, here we focus on eigenvectors
+            eigenvector_track = cis_eigs[1][['chrom', 'start', 'end', 'E1']]
+            eigenvector_track = eigenvector_track.loc[eigenvector_track['chrom'] == chro]
+
+            # eigenvector_track.reset_index(drop=True, inplace=True
+
+            if pos == 0:
+                df = eigenvector_track
+                df.rename({'E1': i}, axis=1, inplace=True)
+            else:
+                df = pd.merge(df, eigenvector_track, how='inner', left_on=['chrom', 'start', 'end'],
+                              right_on=['chrom', 'start', 'end'])
+                df.rename({'E1': i}, axis=1, inplace=True)
+
+        df['diff_omf_ymf'] = difference(df)
+        df = df[['chrom', 'start', 'end', 'diff_omf_ymf']]
+
+        df['diff_omf_ymf'] = df['diff_omf_ymf'].rolling(50).mean()
+        diff = df.loc[0].at['end']
+        df['end1'] = df['end'] + 49*diff
+
+        df = df.dropna()
+
+        df['z_score'] = zscore(df['diff_omf_ymf'])
+
+        # df['zscore'] = (df['diff_omf_ymf'] - df['diff_omf_ymf'].mean()) #/ df.a.std(ddof=0)
+
+        print(df)
+        exit()
 
 
 def generate_balance(save_fig=True):
@@ -198,7 +263,7 @@ def generate_balance(save_fig=True):
 
 
 def generate_difference(save_fig=True):
-    for region in regions[28:29]:
+    for region in regions:
         print(region)
         for resolution in resolutions[1:]:
             loaded_coolers = {}
@@ -243,8 +308,9 @@ def generate_insulation(save_fig=True):
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 # compartmentalization(datatype='norm', resolution=100000)
-compartment_overlay(datatype='raw', resolution=100000, save_fig=True)
-# generate_balance(save_fig=False)
+# compartment_overlay(datatype='raw', resolution=500000, save_fig=True)
+eigen_pvalue(datatype='raw', resolution=100000, save_fig=True)
+# generate_balance(save_fig=True)
 # generate_difference(save_fig=True)
 # generate_insulation_scores()
 # generate_insulation(save_fig=False)
