@@ -31,7 +31,7 @@ paths = {
 
 resolutions = [('50kb', 50000), ('100kb', 100000), ('500kb', 500000), ('1mb', 1000000)]
 samples = ['of', 'om', 'omf', 'yf', 'ym', 'ymf']
-# samples = ['of', 'om', 'yf', 'ym']
+samples = ['omf', 'ymf']
 
 
 pairs = [('of', 'of'),  ('of', 'om'),  ('of', 'omf'),  ('of', 'yf'),  ('of', 'ym'),  ('of', 'ymf'),
@@ -41,32 +41,13 @@ pairs = [('of', 'of'),  ('of', 'om'),  ('of', 'omf'),  ('of', 'yf'),  ('of', 'ym
          ('ym', 'of'),  ('ym', 'om'),  ('ym', 'omf'),  ('ym', 'yf'),  ('ym', 'ym'),  ('ym', 'ymf'),
          ('ymf', 'of'), ('ymf', 'om'), ('ymf', 'omf'), ('ymf', 'yf'), ('ymf', 'ym'), ('ymf', 'ymf'),]
 
-# pairs = [('of', 'of'),  ('of', 'om'),  ('of', 'yf'),  ('of', 'ym'),
-#          ('om', 'of'),  ('om', 'om'),  ('om', 'yf'),  ('om', 'ym'),
-#          ('yf', 'of'),  ('yf', 'om'),  ('yf', 'yf'),  ('yf', 'ym'),
-#          ('ym', 'of'),  ('ym', 'om'),  ('ym', 'yf'),  ('ym', 'ym'),]
+pairs = [('omf', 'ymf'), ('ymf', 'omf'),]
 
-regions = [('Section F', 'chr8', 101000000, 103000000), ('Section G', 'chr8', 15000000, 19000000),
-           ('Section 15-A', 'chr15', 15000000, 20000000), ('Section 15-AB', 'chr15', 15000000, 26000000),
-           ('Section 15-B', 'chr15', 21000000, 26000000),
-           ('Section 1-A', 'chr1', 25000000, 35000000), ('Section 1-B', 'chr1', 90000000, 112500000),
-           ('Section 1-C', 'chr1', 140000000, 150000000), ('Section 1-C', 'chr1', 140000000, 150000000),
-           ('Section 1-C', 'chr1', 140000000, 150000000),
-           ('Section 2-A', 'chr2', 25000000, 30000000),
-           ('Section 14-A', 'chr14', 11000000, 13000000),  ('Section 14-B', 'chr14', 38000000, 40000000),
-           ('Section 14-C', 'chr14', 96000000, 98000000),  ('Section 14-D', 'chr14', 108000000, 110800000),
-           ('Section 3-A', 'chr3', 10000000, 15000000), ('Section 3-B', 'chr3', 41000000, 45000000),
-           ('Section 6-A', 'chr6', 11000000, 12500000), ('Section 6-B', 'chr6', 19000000, 21000000),
-           ('Section 6-C', 'chr6', 79000000, 81000000), ('Section 6-D', 'chr6', 101000000, 107000000),
-           ('Section 6-E', 'chr6', 132000000, 136000000),
-           ('Section 12-A', 'chr12', 43000000, 45000000),
-           ('Section 7-A', 'chr7', 53000000, 56000000), ('Section 7-B', 'chr7', 85000000, 86000000),
-           ('Section 17-A', 'chr17', 18000000, 20000000), ('Section 17-B', 'chr17', 38000000, 41000000),
-           ('Section 17-C', 'chr17', 53000000, 56000000), ('Section 17-D', 'chr17', 58000000, 62000000),
-           ('Section 19-A', 'chr19', 59000000, 60000000),
-           ('Section 18-A', 'chr18', 16000000, 20000000),
-           ('Section 11-A', 'chr11', 10000000, 11000000), ('Section 11-B', 'chr11', 36000000, 42000000),
-           ('Section 10-A', 'chr10', 122000000, 124000000),]
+
+regions = [('Section-Zscore--3.05', 'chr1', 30500000, 35500000),
+           ('Section-Zscore--2.59', 'chr1', 149500000, 154500000),
+           ('Section-Zscore--2.20', 'chr1', 113000000, 118000000),
+           ('Section-Zscore-- -1.85', 'chr1', 85000000, 90000000),]
 
 tad_regions = [('Section G', 'chr8', 5000000, 40000000), ('Section F', 'chr8', 10000000, 30000000)]
 
@@ -182,7 +163,27 @@ def compartment_overlay(datatype, resolution, save_fig=False):
 def difference(x):
     return abs(x['omf'] - x['ymf'])
 
-def eigen_pvalue(datatype, resolution, save_fig=False):
+
+def filter(x):
+    covered_regions = []
+
+    print(x['z_score'])
+
+    exit()
+
+    if x[(x['z_score'] < 1.5) | (x['z_score'] > -1.5)]:
+        return False
+    # else:
+    #     for i in covered_regions:
+    #         covered = False
+    #         if x[(x['start'] > i[1]) | (x['end1'] < i[0])]:
+    #             covered_regions.append((x['start'], x['end1']))
+    #             return True
+
+
+
+
+def eigen_pvalue(datatype, resolution, save_fig=False, window=50):
     # fasta sequence is required for calculating binned profile of GC content
     if not os.path.isfile('../MuSC_HiC_files/fasta/mm10.fa'):
         # note downloading a ~1Gb file can take a minute
@@ -236,18 +237,51 @@ def eigen_pvalue(datatype, resolution, save_fig=False):
         df['diff_omf_ymf'] = difference(df)
         df = df[['chrom', 'start', 'end', 'diff_omf_ymf']]
 
-        df['diff_omf_ymf'] = df['diff_omf_ymf'].rolling(50).mean()
+        df['diff_omf_ymf'] = df['diff_omf_ymf'].rolling(window).mean()
         diff = df.loc[0].at['end']
-        df['end1'] = df['end'] + 49*diff
+        df['end1'] = df['end'] + (window-1)*diff
 
-        df = df.dropna()
+        # df = df.dropna()
+        df = df.fillna(0)
 
         df['z_score'] = zscore(df['diff_omf_ymf'])
 
-        # df['zscore'] = (df['diff_omf_ymf'] - df['diff_omf_ymf'].mean()) #/ df.a.std(ddof=0)
+        df.sort_values(by=['z_score'], inplace=True, key=abs, ascending=False)
 
-        print(df)
-        exit()
+
+        ## Not so good coding practice here.
+        start = df['start'].to_list()
+        end1 = df['end1'].to_list()
+        z_scores = df['z_score'].to_list()
+
+        assert len(start) == len(end1) == len(z_scores)
+
+        covered_regions = []
+        actual_regions = []
+
+        for i, j, k in zip(start, end1, z_scores):
+            if k < -1.5 or k > 1.5:
+                identified = False
+                for x in actual_regions:
+                    if i < x[0] and j > x[0]:
+                        identified = True
+                    elif  i < x[1] and j > x[1]:
+                        identified = True
+                if identified == False:
+                    covered_regions.append(True)
+                    actual_regions.append((i, j))
+                else:
+                    covered_regions.append(False)
+            else:
+                covered_regions.append(False)
+
+        assert len(covered_regions) == len(z_scores)
+        df['filtered'] = covered_regions
+
+        df.sort_values(by=['filtered', 'z_score'], inplace=True, key=abs, ascending=False)
+
+        df.to_csv('../Results/Pvalues/{}.csv'.format(chro), sep='\t', encoding='utf-8', index=False)
+
 
 
 def generate_balance(save_fig=True):
@@ -308,9 +342,9 @@ def generate_insulation(save_fig=True):
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 # compartmentalization(datatype='norm', resolution=100000)
-# compartment_overlay(datatype='raw', resolution=500000, save_fig=True)
-eigen_pvalue(datatype='raw', resolution=100000, save_fig=True)
+# compartment_overlay(datatype='norm', resolution=1000000, save_fig=True)
+# eigen_pvalue(datatype='norm', resolution=500000, save_fig=True, window=10)
 # generate_balance(save_fig=True)
-# generate_difference(save_fig=True)
+generate_difference(save_fig=True)
 # generate_insulation_scores()
 # generate_insulation(save_fig=False)
