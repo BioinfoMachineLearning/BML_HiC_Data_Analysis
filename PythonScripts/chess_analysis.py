@@ -51,8 +51,8 @@ def search_similarity(window_size, step_size, pair_1, pair_2):
         if not os.path.isfile(chess_sim_results):
             print('Generating similarity for {} {} and {}'.format(i, pair_1, pair_2))
             subprocess.call('chess sim \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool\
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool \
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool\
                                         ../Results/Bed/mm10_{}_{}_win_{}_step.bed \
                                         {} \
                                         -p 4'.format(pair_1, pair_2, i, convert_bytes(window_size).replace(" ", ""),
@@ -163,7 +163,7 @@ def vis_sim_results(window_size=50000000, step_size=10000, resolution=1000000, f
 
 
 # search_similarity()
-examine_similarity(window_size=3000000, step_size=150000)
+examine_similarity(window_size=10000000, step_size=100000)
 # vis_sim_results(features=False, save_fig=True)
 # import matplotlib.pyplot as plt
 # fig, axes = plt.subplots(1, 3, figsize=(16, 8))
