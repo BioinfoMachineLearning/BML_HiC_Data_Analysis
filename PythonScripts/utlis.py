@@ -89,25 +89,25 @@ def difference_matrix(clrs, region, res, save_fig=True, data_type='raw'):
            Returns:
            void:
            """
-    nrows = 6
-    ncols = 6
+    nrows = 1
+    ncols = 2
     fig, axs = plt.subplots(
         nrows, ncols, figsize=(20, 16),
     )
     positions = get_positions(nrows, ncols)
     for i, j in enumerate(clrs):
         pos = positions[i]
-        im = axs[pos[0], pos[1]].matshow(
+        im = axs[pos[1]].matshow(
             clrs[j],
             vmin=-0.01,
             vmax=.01,
             cmap='coolwarm',
             extent=(region[2], region[3], region[3], region[2])
         );
-        axs[pos[0], pos[1]].set_xlim(region[2], region[3]);
-        divider = make_axes_locatable(axs[pos[0], pos[1]])
+        axs[pos[1]].set_xlim(region[2], region[3]);
+        divider = make_axes_locatable(axs[pos[1]])
         cax = divider.append_axes("right", size="5%", pad=0.1)
-        axs[pos[0], pos[1]].set_title(j, fontsize=18, fontweight="bold")
+        axs[pos[1]].set_title(j, fontsize=18, fontweight="bold")
         plt.colorbar(im, cax=cax, label='corrected frequencies');
 
     plt.suptitle(f'{region[0]}:{region[1]}-{region[2]:,}--{region[3]:,} at {res}\n',
@@ -273,6 +273,12 @@ def ab_plot_overlay(eigenvector_track, ax, sample):
         4: 'indigo',
         5: 'violet'
     }
+
+    colors = {
+        0: 'red',
+        1: 'blue'
+    }
+
     data = eigenvector_track['E1'].values
 
 

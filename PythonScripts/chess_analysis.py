@@ -13,6 +13,8 @@ pairs = [('of', 'om'),  ('of', 'omf'), ('of', 'yf'),   ('of', 'ym'),  ('of', 'ym
          ('ym', 'of'),  ('ym', 'om'),  ('ym', 'omf'),  ('ym', 'yf'),  ('ym', 'ymf'),
          ('ymf', 'of'), ('ymf', 'om'), ('ymf', 'omf'), ('ymf', 'yf'), ('ymf', 'ym'), ]
 
+pairs = [('omf', 'ymf'), ('ymf', 'omf')]
+
 def create_bed(chrom='all', window_size=50000000, step_size=10000):
     '''
         Generating a pairs input file
@@ -39,7 +41,7 @@ def create_bed(chrom='all', window_size=50000000, step_size=10000):
         print("Bed file {} exist".format(bed_path))
 
 
-def search_similarity(window_size, step_size, pair_1, pair_2):
+def search_similarity(window_size, step_size, pair_1, pair_2, p=4):
     '''
         run the search with the chess sim subcommand:
     :return:
@@ -51,12 +53,12 @@ def search_similarity(window_size, step_size, pair_1, pair_2):
         if not os.path.isfile(chess_sim_results):
             print('Generating similarity for {} {} and {}'.format(i, pair_1, pair_2))
             subprocess.call('chess sim \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool\
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool \
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool\
                                         ../Results/Bed/mm10_{}_{}_win_{}_step.bed \
                                         {} \
-                                        -p 4'.format(pair_1, pair_2, i, convert_bytes(window_size).replace(" ", ""),
-                                                     convert_bytes(step_size).replace(" ", ""), chess_sim_results),
+                                        -p {}'.format(pair_1, pair_2, i, convert_bytes(window_size).replace(" ", ""),
+                                                     convert_bytes(step_size).replace(" ", ""), chess_sim_results, p),
                             shell=True)
         else:
             print("Similarity file {} exist".format(chess_sim_results))
@@ -67,8 +69,8 @@ def search_similarity(window_size, step_size, pair_1, pair_2):
             print(chess_extract_results)
             subprocess.call('chess extract \
                                         ../Results/Bed/mm10_{}_{}_win_{}_step.bed \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool \
-                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_100000.cool \
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool \
+                                        ../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_500000.cool \
                                         {} \
                                         '.format(i, convert_bytes(window_size).replace(" ", ""),
                                                      convert_bytes(step_size).replace(" ", ""),
@@ -80,9 +82,9 @@ def search_similarity(window_size, step_size, pair_1, pair_2):
 
 
 # window_size=50000000, step_size=10000
-def examine_similarity(window_size=5000000, step_size=10000):
+def examine_similarity(window_size=5000000, step_size=10000, p=4):
     for i in pairs:
-        search_similarity(window_size, step_size, i[0], i[1])
+        search_similarity(window_size, step_size, i[0], i[1], p=p)
 
 
 def vis_sim_results(window_size=50000000, step_size=10000, resolution=1000000, features=False, save_fig=False):
@@ -163,7 +165,7 @@ def vis_sim_results(window_size=50000000, step_size=10000, resolution=1000000, f
 
 
 # search_similarity()
-examine_similarity(window_size=3000000, step_size=150000)
+examine_similarity(window_size=10000000, step_size=100000, p=6)
 # vis_sim_results(features=False, save_fig=True)
 # import matplotlib.pyplot as plt
 # fig, axes = plt.subplots(1, 3, figsize=(16, 8))
