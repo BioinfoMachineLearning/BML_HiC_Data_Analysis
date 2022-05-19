@@ -1,5 +1,4 @@
 import statistics
-
 import pandas as pd
 import cooltools
 from matplotlib import pyplot as plt
@@ -20,9 +19,11 @@ import bioframe
 import matplotlib.patches as patches
 from scipy.ndimage import zoom
 from scipy import ndimage as ndi
-
+import cooler
 
 bp_formatter = EngFormatter('b')
+
+
 def format_ticks(ax, x=True, y=True, rotate=True):
     if y:
         ax.yaxis.set_major_formatter(bp_formatter)
@@ -127,7 +128,7 @@ def ims(clrs, res, gene):
     fig, ax = plt.subplots(4, 4, figsize=(20, 18))
     for s1, sample1 in enumerate(normalized_contacts):
         for s2, sample2 in enumerate(normalized_contacts):
-            sampleA = sample1 - np.eye(sample1.shape[0])*sample1
+            sampleA = sample1 - np.eye(sample1.shape[0]) * sample1
             sampleB = sample2 - np.eye(sample2.shape[0]) * sample2
             im = ax[s1, s2].imshow(sampleA - sampleB, vmin=-0.01, vmax=.01, cmap='RdBu')
 
@@ -137,8 +138,8 @@ def ims(clrs, res, gene):
 
 
 def get_windows(m):
-    scale = [3, 5, 7, 10, 15, 25]
-    return [i*m for i in scale]
+    scale = [3, 5, 10, 25]
+    return [i * m for i in scale]
 
 
 def coverage(clr):
@@ -214,7 +215,8 @@ def plot_rep(data, chrom, res, save_fig):
     )
 
     # Set descriptions:
-    plt.title("Stratum-adjusted correlation coefficient plot between samples -- {} -- {}".format(chrom, convert_bytes(res[1])))
+    plt.title("Stratum-adjusted correlation coefficient plot between samples -- {} -- {}".format(chrom,
+                                                                                                 convert_bytes(res[1])))
     plt.ylabel('SCC score')
     plt.xlabel('Samples')
 
@@ -241,10 +243,9 @@ def plot_rep(data, chrom, res, save_fig):
     else:
         plt.show()
 
+
 def ab_plot(eigenvector_track, ax, sample):
-
     data = eigenvector_track['E1'].values
-
 
     dataA = data.copy()
     dataB = data.copy()
@@ -264,7 +265,6 @@ def ab_plot(eigenvector_track, ax, sample):
 
 
 def ab_plot_overlay(eigenvector_track, ax, sample):
-
     colors = {
         0: 'red',
         1: 'orange',
@@ -281,7 +281,6 @@ def ab_plot_overlay(eigenvector_track, ax, sample):
 
     data = eigenvector_track['E1'].values
 
-
     dataA = data.copy()
     dataB = data.copy()
 
@@ -290,146 +289,167 @@ def ab_plot_overlay(eigenvector_track, ax, sample):
 
     xcoord = list(range(0, len(dataA)))
 
-    #ax.bar(xcoord, dataA, color="red")
-    #ax.bar(xcoord, dataB, color="blue")
+    # ax.bar(xcoord, dataA, color="red")
+    # ax.bar(xcoord, dataB, color="blue")
     ax.plot(eigenvector_track['E1'].values, label=sample[1], color=colors[sample[0]])
     ax.plot([0, len(dataA)], [0, 0], 'k', lw=0.25)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
 
+DATA_PATH = '../MuSC_HiC_files/HiC_CPB_normalized/normalized_{}_{}.cool'
+INSULATION_PATH = '../Results/Insulation/insulation_score_{}_{}.csv'
 
+def insulation_plot(data, group, resolution, enhancer, save_fig=True):
+    for region in data:
+        nrows = 2
+        ncols = 1
 
-def insulation_plot(data, save_fig=True):
-    nrows = 6
-    ncols = 1
-    fig, axs = plt.subplots(
-        nrows, ncols, figsize=(20, 16),
-    )
-    norm = LogNorm(vmax=0.1, vmin=0.001)
-    positions = get_positions(nrows, ncols)
+        print(region)
+        adjusted_region = (region[1], region[4], region[5])
 
-    for i, j in enumerate(data):
-        resolution = int(j.split('_')[1])
+        fig, axs = plt.subplots(
+            nrows, ncols, figsize=(20, 16),
+        )
+
+        norm = LogNorm(vmax=0.1, vmin=0.001)
+        positions = get_positions(nrows, ncols)
 
         window = get_windows(resolution)
-        region = data[j][1]
 
-        route = (region[1], region[2], region[2]+ 80*window[0])
-        # clr = data[j][0].matrix(balance=True).fetch(route)
-        clr = data[j][0].matrix(balance=True).fetch(region[1:])
+        for pos, condition in enumerate(group):
 
-        sample = j.split('_')[0]
-        pos = positions[i]
-        im = pcolormesh_45deg(axs[pos[0]], clr, start=region[2], resolution=resolution, norm=norm, cmap='fall')
-        # axs[pos[0]].set_aspect(0.5)
-        axs[pos[0]].set_ylim(0, window[0] * 10)
-        format_ticks(axs[pos[0]], rotate=False)
-        axs[pos[0]].xaxis.set_visible(False)
-        axs[pos[0]].set_title(sample, fontsize=14)
+            clr = cooler.Cooler('{}'.format(DATA_PATH.format(condition, resolution))) \
+                .matrix(balance=True).fetch(adjusted_region)
+            ax = axs[positions[pos][0]]
+            im = pcolormesh_45deg(ax,
+                                  clr,
+                                  start=adjusted_region[1],
+                                  resolution=resolution,
+                                  norm=norm,
+                                  cmap='fall')
+            ax.set_aspect(0.5)
+            ax.set_ylim(0, window[0] * 20)
+            format_ticks(ax, rotate=False)
+            ax.xaxis.set_visible(False)
+            ax.set_title(condition + " " + region[1] + " " +
+                         str(region[4]) + " ---- " +
+                         str(region[5]),
+                         fontsize=18,
+                         fontweight="bold")
 
-        divider = make_axes_locatable(axs[pos[0]])
-        cax = divider.append_axes("right", size="1%", pad=0.1)
-        plt.colorbar(im, cax=cax)
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="1%", pad=0.1)
+            plt.colorbar(im, cax=cax)
 
-        INSULATION_PATH = '../Results/Insulation/insulation_score_{}_{}.csv'
-        file_name = INSULATION_PATH.format(sample, resolution)
-        df = pd.read_csv(file_name)
+            INSULATION_PATH = '../Results/Insulation/insulation_score_{}_{}.csv'.format(condition, resolution)
+            df = pd.read_csv(INSULATION_PATH)
 
-        insul_region = bioframe.select(df, region[1:])
-        ins_ax = divider.append_axes("bottom", size="50%", pad=0., sharex=axs[pos[0]])
-        ins_ax.set_prop_cycle(plt.cycler("color", plt.cm.plasma(np.linspace(0, 1, 5))))
-        ins_ax.plot(insul_region[['start', 'end']].mean(axis=1),
-                    insul_region[f'log2_insulation_score_{window[0]}'],
-                    label='{}'.format(convert_bytes(window[0])))
-        ins_ax.legend(bbox_to_anchor=(1.100, 1.05), loc='upper right')
-
-        format_ticks(ins_ax, y=False, rotate=False)
-        axs[pos[0]].set_xlim(region[2], region[3])
-
-        for res in window[1:]:
+            insul_region = bioframe.select(df, adjusted_region)
+            ins_ax = divider.append_axes("bottom", size="50%", pad=0., sharex=ax)
+            ins_ax.set_prop_cycle(plt.cycler("color", plt.cm.plasma(np.linspace(0, 1, 5))))
             ins_ax.plot(insul_region[['start', 'end']].mean(axis=1),
-                        insul_region[f'log2_insulation_score_{res}'],
-                        label=f'{convert_bytes(res)}')
-        ins_ax.legend(bbox_to_anchor=(1.06, 0.998), loc='upper right')
+                        insul_region[f'log2_insulation_score_{window[0]}'],
+                        label='{}'.format(convert_bytes(window[0])))
+            ins_ax.legend(bbox_to_anchor=(1.100, 1.05), loc='upper right')
 
-        plt.suptitle(f'TADs -- Gene: {region[0]} -- chromosome: {region[1]} -- Region {region[2]:,}-{region[3]:,} -- Resolution: {convert_bytes(resolution)}\n',
-                     fontsize=18, ha='center', fontweight="bold")
-        plt.tight_layout()
+            format_ticks(ins_ax, y=False, rotate=False)
+            ax.set_xlim(region[4], region[5])
 
-    if save_fig:
-        plt.savefig("../plots/Insulation/{}_{}.png".format(region[0], resolution))
-    else:
-        plt.show()
+            for res in window[1:]:
+                ins_ax.plot(insul_region[['start', 'end']].mean(axis=1),
+                            insul_region[f'log2_insulation_score_{res}'],
+                            label=f'{convert_bytes(res)}')
+            ins_ax.legend(bbox_to_anchor=(1.06, 0.998), loc='upper right')
+
+            plt.suptitle(f'TADs -- Unique Enhancer Region: {str(region[1])+"   "+ str(region[2])+ "   "+ str(region[3])} \n Resolution: {resolution}\n',
+                         fontsize=24, ha='center', fontweight="bold")
+            plt.tight_layout()
+
+        if save_fig:
+            plt.savefig("../plots/Insulation/{}/{}_{}_{}.png".format(enhancer, region[1], region[2], region[3]))
+        else:
+            plt.show()
 
 
-def boundaries(data, save_fig=True):
-    nrows = 6
-    ncols = 1
-    fig, axs = plt.subplots(
-        nrows, ncols, figsize=(20, 16),
-    )
-    norm = LogNorm(vmax=0.1, vmin=0.001)
-    positions = get_positions(nrows, ncols)
+def boundaries(data, group, resolution, enhancer, save_fig=True):
+    for region in data:
+        nrows = 2
+        ncols = 1
 
-    for i, j in enumerate(data):
-        resolution = int(j.split('_')[1])
+        print(region)
+        adjusted_region = (region[1], region[4], region[5])
+
+        fig, axs = plt.subplots(
+            nrows, ncols, figsize=(20, 16),
+        )
+
+        norm = LogNorm(vmax=0.1, vmin=0.001)
+        positions = get_positions(nrows, ncols)
+
         window = get_windows(resolution)
 
-        region = data[j][1]
-        route = (region[1], region[2], region[2] + 80 * window[0])
-        # clr = data[j][0].matrix(balance=True).fetch(route)
-        clr = data[j][0].matrix(balance=True).fetch(region[1:])
+        for pos, condition in enumerate(group):
 
-        sample = j.split('_')[0]
-        pos = positions[i]
-        im = pcolormesh_45deg(axs[pos[0]], clr, start=region[2], resolution=resolution, norm=norm, cmap='fall')
-        # axs[pos[0]].set_aspect(0.5)
-        axs[pos[0]].set_ylim(0, window[0] * 10)
-        format_ticks(axs[pos[0]], rotate=False)
-        axs[pos[0]].xaxis.set_visible(False)
-        axs[pos[0]].set_title(sample, fontsize=14)
+            clr = cooler.Cooler('{}'.format(DATA_PATH.format(condition, resolution))) \
+                .matrix(balance=True).fetch(adjusted_region)
+            ax = axs[positions[pos][0]]
+            im = pcolormesh_45deg(ax,
+                                  clr,
+                                  start=adjusted_region[1],
+                                  resolution=resolution,
+                                  norm=norm,
+                                  cmap='fall')
+            ax.set_aspect(0.5)
+            ax.set_ylim(0, window[0] * 20)
+            format_ticks(ax, rotate=False)
+            ax.xaxis.set_visible(False)
+            ax.set_title(condition + " " +
+                         region[1] + " " +
+                         str(region[4]) +
+                         " ---- " +
+                         str(region[5]),
+                         fontsize=18, fontweight="bold")
 
-        divider = make_axes_locatable(axs[pos[0]])
-        cax = divider.append_axes("right", size="1%", pad=0.1)
-        plt.colorbar(im, cax=cax)
+            divider = make_axes_locatable(ax)
 
-        INSULATION_PATH = '../Results/Insulation/insulation_score_{}_{}.csv'
-        file_name = INSULATION_PATH.format(sample, resolution)
-        df = pd.read_csv(file_name)
-        # df = find_boundaries(df)
+            cax = divider.append_axes("right", size="1%", pad=0.1)
+            plt.colorbar(im, cax=cax)
 
-        insul_region = bioframe.select(df, region[1:])
-        ins_ax = divider.append_axes("bottom", size="50%", pad=0., sharex=axs[pos[0]])
-        # ins_ax.set_prop_cycle(plt.cycler("color", plt.cm.plasma(np.linspace(0, 1, 5))))
-        ins_ax.plot(insul_region[['start', 'end']].mean(axis=1),
-                    insul_region[f'log2_insulation_score_{window[0]}'],
-                    label='{}'.format(convert_bytes(window[0])))
-        ins_ax.legend(bbox_to_anchor=(1.100, 1.05), loc='upper right')
+            INSULATION_PATH = '../Results/Insulation/insulation_score_{}_{}.csv'.format(condition, resolution)
+            df = pd.read_csv(INSULATION_PATH)
 
-        boundaries = insul_region[~np.isnan(insul_region[f'boundary_strength_{window[0]}'])]
-        weak_boundaries = boundaries[~boundaries[f'is_boundary_{window[0]}']]
-        strong_boundaries = boundaries[boundaries[f'is_boundary_{window[0]}']]
+            insul_region = bioframe.select(df, adjusted_region)
+            ins_ax = divider.append_axes("bottom", size="50%", pad=0., sharex=ax)
+            # ins_ax.set_prop_cycle(plt.cycler("color", plt.cm.plasma(np.linspace(0, 1, 5))))
+            ins_ax.plot(insul_region[['start', 'end']].mean(axis=1),
+                        insul_region[f'log2_insulation_score_{window[0]}'],
+                        label='{}'.format(convert_bytes(window[0])))
+            ins_ax.legend(bbox_to_anchor=(1.100, 1.05), loc='upper right')
 
-        ins_ax.scatter(weak_boundaries[['start', 'end']].mean(axis=1),
-                       weak_boundaries[f'log2_insulation_score_{window[0]}'], label='Weak boundaries')
-        ins_ax.scatter(strong_boundaries[['start', 'end']].mean(axis=1),
-                       strong_boundaries[f'log2_insulation_score_{window[0]}'], label='Strong boundaries')
+            boundaries = insul_region[~np.isnan(insul_region[f'boundary_strength_{window[0]}'])]
+            weak_boundaries = boundaries[~boundaries[f'is_boundary_{window[0]}']]
+            strong_boundaries = boundaries[boundaries[f'is_boundary_{window[0]}']]
 
-        ins_ax.legend(bbox_to_anchor=(1.125, 1.05), loc='upper right')
+            ins_ax.scatter(weak_boundaries[['start', 'end']].mean(axis=1),
+                           weak_boundaries[f'log2_insulation_score_{window[0]}'], label='Weak boundaries')
+            ins_ax.scatter(strong_boundaries[['start', 'end']].mean(axis=1),
+                           strong_boundaries[f'log2_insulation_score_{window[0]}'], label='Strong boundaries')
 
-        format_ticks(ins_ax, y=False, rotate=False)
-        axs[pos[0]].set_xlim(region[2], region[3])
+            ins_ax.legend(bbox_to_anchor=(1.125, 1.05), loc='upper right')
 
-        plt.suptitle(
-            f'Annotated valleys: {region[0]} -- chromosome: {region[1]} -- Region {region[2]:,}-{region[3]:,} -- Resolution: {convert_bytes(resolution)}\n',
-            fontsize=18, ha='center', fontweight="bold")
-        plt.tight_layout()
+            format_ticks(ins_ax, y=False, rotate=False)
+            ax.set_xlim(region[4], region[5])
 
-    if save_fig:
-        plt.savefig("../plots/Boundary/{}_{}.png".format(region[0], resolution))
-    else:
-        plt.show()
+            plt.suptitle(
+                f'TADs -- Unique Enhancer Region: {str(region[1]) + "   " + str(region[2]) + "   " + str(region[3])} \n Resolution: {resolution}\n',
+                fontsize=24, ha='center', fontweight="bold")
+            plt.tight_layout()
+
+        if save_fig:
+            plt.savefig("../plots/Boundary/{}/{}_{}_{}.png".format(enhancer, region[1], region[2], region[3]))
+        else:
+            plt.show()
 
 
 def clipped_zoom(img, zoom_factor, **kwargs):
@@ -441,16 +461,16 @@ def clipped_zoom(img, zoom_factor, **kwargs):
         top = (h - zh) // 2
         left = (w - zw) // 2
         out = np.zeros_like(img)
-        out[top:top+zh, left:left+zw] = zoom(img, zoom_tuple, **kwargs)
+        out[top:top + zh, left:left + zw] = zoom(img, zoom_tuple, **kwargs)
     elif zoom_factor > 1:
         zh = int(np.round(h / zoom_factor))
         zw = int(np.round(w / zoom_factor))
         top = (h - zh) // 2
         left = (w - zw) // 2
-        out = zoom(img[top:top+zh, left:left+zw], zoom_tuple, **kwargs)
+        out = zoom(img[top:top + zh, left:left + zw], zoom_tuple, **kwargs)
         trim_top = ((out.shape[0] - h) // 2)
         trim_left = ((out.shape[1] - w) // 2)
-        out = out[trim_top:trim_top+h, trim_left:trim_left+w]
+        out = out[trim_top:trim_top + h, trim_left:trim_left + w]
     else:
         out = img
     return out
@@ -517,12 +537,10 @@ def plot_signal_noise_ratio(sub_sim, sim_field, zsim_thr, region_id, data1, data
         ax3 = fig.add_subplot(gs[1, 1:2])
         ax4 = fig.add_subplot(gs[1, 2:3])
 
-
     all_X = regions.loc[similarities.index, 1:2].mean(axis=1).values / 10 ** 6
     X = regions.loc[sub_sim.index, 1:2].mean(axis=1).values / 10 ** 6
     S = sub_sim[sim_field]
     SN = sub_sim["SN"]
-
 
     ax1.plot(all_X, similarities[sim_field], ":", alpha=0.4)
     ax1.hlines(zsim_thr, 0, max(all_X), linestyle=":", color="red")
@@ -560,7 +578,7 @@ def plot_signal_noise_ratio(sub_sim, sim_field, zsim_thr, region_id, data1, data
 
         # clipped zoom and rotate patient and control and keep only half-matrix
         zm1 = clipped_zoom(pair_A_sub, 0.7)
-        rot_pair_A= ndi.rotate(zm1, 45, reshape=False)
+        rot_pair_A = ndi.rotate(zm1, 45, reshape=False)
 
         zm2 = clipped_zoom(pair_B_sub, 0.7)
         rot_pair_B = ndi.rotate(zm2, 45, reshape=False)
@@ -591,8 +609,3 @@ def plot_signal_noise_ratio(sub_sim, sim_field, zsim_thr, region_id, data1, data
         plt.savefig("../plots/Chess/{}_{}_{}.png".format(chrom, pairs[0], pairs[1]))
     else:
         plt.show()
-
-    #
-
-
-
