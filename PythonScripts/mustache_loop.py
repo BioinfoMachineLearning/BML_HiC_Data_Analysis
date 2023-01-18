@@ -1,3 +1,3 @@
 import subprocess
 
-subprocess.call('mustache -f ', shell=True)
+subprocess.call('hiccups  -f ', shell=True)

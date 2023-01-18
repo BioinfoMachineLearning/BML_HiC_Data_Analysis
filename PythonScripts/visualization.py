@@ -102,7 +102,7 @@ def compartmentalization(datatype, resolution, save_fig=True):
             ax[0].legend(custom_lines, ['B', 'A'], loc="upper right", fontsize=10)
 
         if save_fig:
-            plt.savefig("../plots/AB/{}_{}_{}.png".format(chro, datatype, resolution))
+            plt.savefig("../Plots/AB/{}_{}_{}.png".format(chro, datatype, resolution))
         else:
             plt.show()
 
@@ -156,7 +156,7 @@ def compartment_overlay(datatype, resolution, save_fig=False):
         plt.title('AB Compartment overlay --- {} --- {}'.format(convert_bytes(resolution), chro))
 
         if save_fig:
-            plt.savefig("../plots/AB_Overlay/{}_{}_{}.png".format(chro, datatype, resolution))
+            plt.savefig("../Plots/AB_Overlay/{}_{}_{}.png".format(chro, datatype, resolution))
         else:
             plt.show()
 
@@ -327,7 +327,6 @@ def generate_insulation_scores():
                  insulation_df.to_csv(file_name)
 
 
-
 def generate_insulation(save_fig=True):
     for tad_region in tad_regions[1:]:
         for resolution in resolutions:
@@ -338,6 +337,7 @@ def generate_insulation(save_fig=True):
 
             insulation_plot(loaded_coolers, save_fig=save_fig)
             boundaries(loaded_coolers, save_fig=save_fig)
+
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)

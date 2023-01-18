@@ -8,7 +8,7 @@ from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid import make_axes_locatable
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm, SymLogNorm
+from matplotlib.colors import LogNorm, SymLogNorm, Normalize
 from matplotlib.ticker import EngFormatter
 import cooltools.lib.plotting
 import fanc
@@ -30,7 +30,7 @@ def format_ticks(ax, x=True, y=True, rotate=True):
         ax.xaxis.set_major_formatter(bp_formatter)
         ax.xaxis.tick_bottom()
     if rotate:
-        ax.tick_params(axis='x', rotation=45)
+        ax.tick_params(axis='x', rotation=90)
 
 
 def get_positions(nrows, ncols):
@@ -38,6 +38,82 @@ def get_positions(nrows, ncols):
     cols = range(ncols)
     return (list(itertools.product(rows, cols)))
 
+
+def balance_matrix2(clrs, region, res, save_fig=True):
+    """
+           Method to plot the Difference between the balanced ICE normalised matrix
+           Parameters:
+           arg1 (clr): cooler object
+           arg2 (regions): regions to filter on ICE matrix
+
+           Returns:
+           void:
+           """
+    nrows = 1
+    ncols = 3
+    fig, axs = plt.subplots(
+        nrows, ncols, figsize=(32, 24),
+    )
+
+
+    ctrl_los_max = max(np.amax(clrs['ctrl']), np.amax(clrs['los']))
+    ctrl_los_min = min(np.amin(clrs['ctrl']), np.amin(clrs['los']))
+
+    diff_max = np.amax(clrs['difference'])
+    diff_min = np.amin(clrs['difference'])
+
+    # positions = get_positions(nrows, ncols)
+    positions = [0, 1, 2]
+    names = {
+        'ctrl': 'Old', 'los': 'Young', 'difference': 'Log2(Old/Young)'
+    }
+    for i, j in enumerate(clrs):
+        pos = positions[i]
+        if i < 2:
+            if ctrl_los_max and ctrl_los_min:
+                norm = LogNorm(vmax=ctrl_los_max, vmin=ctrl_los_min)
+            elif ctrl_los_max:
+                norm = LogNorm(vmax=ctrl_los_max)
+            else:
+                norm = LogNorm(vmax=0.1)
+
+            im = axs[pos].matshow(
+                clrs[j],
+                norm=norm,
+                cmap='fall',
+                extent=(region[1], region[2], region[2], region[1]));
+        if i == 2:
+            norm = LogNorm(vmax=diff_max)
+            norm = Normalize(vmax=1.0, vmin=-1.0)
+
+            im = axs[pos].matshow(
+                clrs[j],
+                norm=norm,
+                cmap='seismic',
+                extent=(region[1], region[2], region[2], region[1]));
+        plt.colorbar(im, ax=axs[pos], fraction=0.046, pad=0.04, label='Counts');
+        axs[pos].set_title('{}'.format(names[j]))
+        axs[pos].set_xlabel('position, Mb')
+        axs[pos].set_ylabel('position, Mb')
+
+        axs[pos].xaxis.set_ticks(np.arange(region[1], region[2] + res[1], res[1]))
+        axs[pos].yaxis.set_ticks(np.arange(region[1], region[2] + res[1], res[1]))
+        format_ticks(axs[pos])
+
+        # axs[pos].set_xlim(region[1], region[2]);
+        # divider = make_axes_locatable(axs[pos])
+        # cax = divider.append_axes("right", size="5%", pad=0.1)
+        # axs[pos].set_title(j, fontsize=18, fontweight="bold")
+        # plt.colorbar(im, cax=cax, label='corrected frequencies');
+
+    plt.suptitle(f'{region[0]}:{region[1]}-{region[2]:,} {res[0]}\n'
+                 f'{region[3][0]} {region[3][1]} {region[3][2]}',
+                 fontsize=14, ha='center')
+    plt.tight_layout()
+    if save_fig:
+        plt.savefig("./{}_{}.png".format(region[3][0], res[0]))
+    else:
+        plt.show()
 
 def balance_matrix(clrs, region, res, save_fig=True, data_type='raw'):
     """
@@ -74,7 +150,7 @@ def balance_matrix(clrs, region, res, save_fig=True, data_type='raw'):
                  fontsize=24, ha='center', fontweight="bold")
     plt.tight_layout()
     if save_fig:
-        plt.savefig("../plots/Balanced/{}/{}_{}.png".format(data_type, region[0], res))
+        plt.savefig("../Plots/Balanced/{}/{}_{}.png".format(data_type, region[0], res))
     else:
         plt.show()
 
@@ -114,7 +190,7 @@ def difference_matrix(clrs, region, res, save_fig=True, data_type='raw'):
                  fontsize=24, ha='center', fontweight="bold")
     plt.tight_layout()
     if save_fig:
-        plt.savefig("../plots/Difference/{}/{}_{}.png".format(data_type, region[0], res))
+        plt.savefig("../Plots/Difference/{}/{}_{}.png".format(data_type, region[0], res))
     else:
         plt.show()
 
@@ -203,6 +279,50 @@ def convert_bytes(num):
         num /= step_unit
 
 
+def get_marker_n_color(val):
+    if val[0] == 1:
+        return val[1], 'blue', 'Same({})'
+    elif val[0] == 2:
+        return val[1], 'green', 'Replicate({})'
+    elif val[0] == 3:
+        return val[1], 'black', 'Replicate({})'
+    elif val[0] == 4:
+        return val[1], 'red', 'Different({})'
+
+
+def line_rep(data, chroms, res, save_fig):
+
+    marker_n_color = {
+        'OF_OF': (1, "."), 'OM_OM': (1, "4"), 'YMF_YMF': (1, "v"), 'OMF_OMF': (1, "^"), 'YF_YF': (1, "<"), 'YM_YM': (1, ">"),
+        'OF_OM': (2, "2"), 'OF_OMF': (2, "d"), 'OM_OMF': (2, "o"),
+        'YF_YM': (3, "8"), 'YF_YMF': (3, "s"),  'YM_YMF': (3, "p"),
+        'OF_YF': (4, "*"), 'OF_YM': (4, "P"), 'OF_YMF': (4, "h"),
+        'OM_YF': (4, "+"), 'OM_YM': (4, "x"), 'OM_YMF': (4, "D"),
+        'OMF_YF': (4, "3"), 'OMF_YM': (4, "_"), 'OMF_YMF': (4, "|")
+    }
+    fig, ax = plt.subplots(figsize=(14, 12))
+
+    for grp in data:
+        marker, color, label = get_marker_n_color(marker_n_color[grp])
+        label = label.format(grp)
+        ax.plot(data[grp], label=label, color=color, marker=marker)
+
+    x_ticks = range(0, len(chroms))
+    ax.set_xticks(ticks=x_ticks)
+    ax.set_xticklabels(labels=chroms, rotation=45)
+
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=7)
+    plt.ylabel('SCC score', fontsize=10)
+    ax.set_xlabel("Chromosome", fontsize=10)
+    plt.title("Stratum-adjusted correlation coefficient scores (SCC) plot \n"
+              "Resolution: {}".format(convert_bytes(res)), fontsize=12)
+    if save_fig:
+        plt.savefig("../Plots/REP/{}.png".format(convert_bytes(res)))
+    else:
+        plt.show()
+
+
 def plot_rep(data, chrom, res, save_fig):
     fig, ax = plt.subplots(figsize=(20, 16))
 
@@ -237,7 +357,7 @@ def plot_rep(data, chrom, res, save_fig):
     ax.legend(custom_lines, ['OLD vs YOUNG', 'OLD vs OLD', 'YOUNG vs YOUNG'], loc="upper right", fontsize=10)
 
     if save_fig:
-        plt.savefig("../plots/REP/{}_{}.png".format(chrom, convert_bytes(res[1])))
+        plt.savefig("../Plots/REP/{}_{}.png".format(chrom, convert_bytes(res[1])))
     else:
         plt.show()
 
@@ -358,7 +478,7 @@ def insulation_plot(data, save_fig=True):
         plt.tight_layout()
 
     if save_fig:
-        plt.savefig("../plots/Insulation/{}_{}.png".format(region[0], resolution))
+        plt.savefig("../Plots/Insulation/{}_{}.png".format(region[0], resolution))
     else:
         plt.show()
 
@@ -427,7 +547,7 @@ def boundaries(data, save_fig=True):
         plt.tight_layout()
 
     if save_fig:
-        plt.savefig("../plots/Boundary/{}_{}.png".format(region[0], resolution))
+        plt.savefig("../Plots/Boundary/{}_{}.png".format(region[0], resolution))
     else:
         plt.show()
 
@@ -588,7 +708,7 @@ def plot_signal_noise_ratio(sub_sim, sim_field, zsim_thr, region_id, data1, data
     plt.tight_layout()
 
     if save_fig:
-        plt.savefig("../plots/Chess/{}_{}_{}.png".format(chrom, pairs[0], pairs[1]))
+        plt.savefig("../Plots/Chess/{}_{}_{}.png".format(chrom, pairs[0], pairs[1]))
     else:
         plt.show()
 

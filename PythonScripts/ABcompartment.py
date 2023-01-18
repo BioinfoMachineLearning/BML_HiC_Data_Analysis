@@ -61,7 +61,7 @@ for chro in chros:
     custom_lines = [Line2D([0], [0], color=cmap(0.0), lw=4),
                     Line2D([0], [0], color=cmap(1.0), lw=4)]
     ax[-1].legend(custom_lines, ['B', 'A'], loc="upper right", fontsize=10)
-    plt.savefig('../plots/ABCompartment/{}.jpg'.format(chro))
+    plt.savefig('../Plots/ABCompartment/{}.jpg'.format(chro))
 
 
         # save plot
@@ -91,7 +91,7 @@ for chro in chros:
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.set_title("Chro "+str(chro))
-    plt.savefig('../plots/PCA/{}.jpg'.format(chro))
+    plt.savefig('../Plots/PCA/{}.jpg'.format(chro))
 
 
 
